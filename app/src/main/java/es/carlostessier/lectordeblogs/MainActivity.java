@@ -6,13 +6,16 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.text.Html;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Toast;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -27,10 +30,12 @@ import java.net.URL;
 public class MainActivity extends ListActivity {
 
     protected String[] mBlogPostTitles;
-    public static int NUMBER_OF_POSTS = 5;
+    public static int NUMBER_OF_POSTS = 10;
     public static String TAG  = MainActivity.class.getSimpleName();
-    public static String URL_JSON ="http://itvocationalteacher.blogspot.com/feeds/posts/default?alt=json&max-results="+NUMBER_OF_POSTS;
+    public static String BLOG = "http://android-developers.blogspot.com.es/";
+    public static String URL_JSON =BLOG+"/feeds/posts/default?alt=json&max-results="+NUMBER_OF_POSTS;
     private boolean networkAvailable;
+    private JSONObject mBlogData;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,7 +49,9 @@ public class MainActivity extends ListActivity {
         else {
             Toast.makeText(this, R.string.no_connection_message, Toast.LENGTH_LONG).show();
         }
-        if (mBlogPostTitles != null) findViewById(R.id.empty).setVisibility(View.INVISIBLE);
+        if (mBlogPostTitles != null)
+            findViewById(R.id.empty).setVisibility(View.INVISIBLE);
+
 
     }
 
@@ -85,11 +92,12 @@ public class MainActivity extends ListActivity {
         return isAvailable;
     }
 
-    private class GetBlogPostsTask extends AsyncTask{
+    private class GetBlogPostsTask extends AsyncTask <Object, Void, JSONObject>{
 
         @Override
-        protected Object doInBackground(Object[] params) {
+        protected JSONObject doInBackground(Object[] params) {
             int responseCode = -1;
+            JSONObject jsonResponse = null;
             try {
                 URL blogFeedUrl = new URL(URL_JSON);
                 HttpURLConnection connection  = (HttpURLConnection) blogFeedUrl.openConnection();
@@ -115,17 +123,8 @@ public class MainActivity extends ListActivity {
 
                     String responseData = responseStrBuilder.toString();
 
-                    JSONObject jsonResponse = new JSONObject(responseData);
+                    jsonResponse = new JSONObject(responseData);
 
-                    JSONObject jsonFeed = jsonResponse.getJSONObject("feed");
-                    JSONArray jsonAentry = jsonFeed.getJSONArray("entry");
-
-                    for (int i = 0; i < jsonAentry.length(); i++) {
-                        JSONObject jsonPost = (JSONObject) jsonAentry.get(i);
-                        JSONObject jsonTitle = (JSONObject) jsonPost.get("title");
-                        String title = jsonTitle.getString("$t");
-                        Log.v(TAG, title);
-                    }
 
 
                 }
@@ -139,7 +138,48 @@ public class MainActivity extends ListActivity {
                 Log.e(TAG, "exception caught:", e);
             }
 
-            return "Code: " + responseCode;
+            return jsonResponse;
+        }
+
+        @Override
+        protected void onPostExecute(JSONObject result){
+            mBlogData = result;
+            updateList();
+        }
+
+    }
+
+    private void updateList() {
+        if (mBlogData == null) {
+            // TODO: Manejar errores
+        } else {
+            // Log.d(TAG,mBlogData.toString());
+            try {
+                JSONObject jsonFeed = mBlogData.getJSONObject("feed");
+                JSONArray jsonAentry = null;
+
+                jsonAentry = jsonFeed.getJSONArray("entry");
+
+                mBlogPostTitles = new String[jsonAentry.length()];
+
+                for (int i = 0; i < jsonAentry.length(); i++) {
+                    JSONObject jsonPost = (JSONObject) jsonAentry.get(i);
+                    JSONObject jsonTitle = (JSONObject) jsonPost.get("title");
+
+                    //String title = Html.escapeHtml(jsonTitle.getString("$t"));
+                    String title =  Html.fromHtml(jsonTitle.getString("$t")).toString();
+
+                    mBlogPostTitles[i] = title;
+
+                    ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+                            android.R.layout.simple_expandable_list_item_1,mBlogPostTitles);
+                    setListAdapter(adapter);
+                    findViewById(R.id.empty).setVisibility(View.INVISIBLE);
+
+                }
+            } catch (JSONException e) {
+                Log.e(TAG, "exception caught:", e);
+            }
         }
     }
 }

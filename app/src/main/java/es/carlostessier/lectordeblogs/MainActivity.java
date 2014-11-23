@@ -12,7 +12,13 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -21,9 +27,9 @@ import java.net.URL;
 public class MainActivity extends ListActivity {
 
     protected String[] mBlogPostTitles;
-    public static int NUMBER_OF_POSTS = 20;
+    public static int NUMBER_OF_POSTS = 5;
     public static String TAG  = MainActivity.class.getSimpleName();
-    public static String URL_JSON ="http://itvocationalteacher.blogspot.com/feeds/posts/default?alt=json";
+    public static String URL_JSON ="http://itvocationalteacher.blogspot.com/feeds/posts/default?alt=json&max-results="+NUMBER_OF_POSTS;
     private boolean networkAvailable;
 
     @Override
@@ -88,7 +94,42 @@ public class MainActivity extends ListActivity {
                 URL blogFeedUrl = new URL(URL_JSON);
                 HttpURLConnection connection  = (HttpURLConnection) blogFeedUrl.openConnection();
                 responseCode = connection.getResponseCode();
-                Log.i(TAG, "Code: " + responseCode);
+
+                if(responseCode==HttpURLConnection.HTTP_OK){
+                    InputStream inputStream = connection.getInputStream();
+                /*    Reader reader = new InputStreamReader(inputStream);
+
+                    int contentLength = connection.getContentLength();
+                    char[] charArray = new char[contentLength];
+                    reader.read(charArray);
+
+                     String responseData = new String(charArray);
+
+*/
+                    BufferedReader streamReader = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
+                    StringBuilder responseStrBuilder = new StringBuilder();
+
+                    String inputStr;
+                    while ((inputStr = streamReader.readLine()) != null)
+                        responseStrBuilder.append(inputStr);
+
+                    String responseData = responseStrBuilder.toString();
+
+                    JSONObject jsonResponse = new JSONObject(responseData);
+
+                    JSONObject jsonFeed = jsonResponse.getJSONObject("feed");
+                    JSONArray jsonAentry = jsonFeed.getJSONArray("entry");
+
+                    for (int i = 0; i < jsonAentry.length(); i++) {
+                        JSONObject jsonPost = (JSONObject) jsonAentry.get(i);
+                        JSONObject jsonTitle = (JSONObject) jsonPost.get("title");
+                        String title = jsonTitle.getString("$t");
+                        Log.v(TAG, title);
+                    }
+
+
+                }
+                else Log.i(TAG, "Conexión fallida: " + responseCode);
 
             } catch (MalformedURLException e) {
                 Log.e(TAG,"exception caught:",e);
